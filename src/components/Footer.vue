@@ -16,7 +16,7 @@
             <span>江西省南昌市红谷滩区丰和南大道</span>
           </div>
         </div>
-        <div class="w-px h-full bg-gray-300 mx-4"></div>
+        <div class="w-px bg-gray-300 mx-4"></div>
         <div class="flex flex-col">
           <div class="mb-2">
             <span class="font-medium">邮箱：</span>
@@ -30,10 +30,14 @@
             <span>&copy; 2017-2022 智信数图 京ICP备14039810号-2</span>
           </div>
         </div>
-        <div class="w-px h-full bg-gray-300 mx-4"></div>
+        <div class="w-px bg-gray-300 mx-4"></div>
         <div class="flex justify-center md:justify-end items-center">
           <div class="text-center">
-            <img src="/qrcode.png" alt="QR Code" class="w-24 h-24 mx-auto mb-2" />
+            <img
+              src="../assets/qrcode.png"
+              alt="QR Code"
+              class="w-24 h-24 mx-auto mb-2"
+            />
             <div class="text-sm">公众号二维码</div>
           </div>
         </div>
