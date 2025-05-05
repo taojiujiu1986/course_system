@@ -10,7 +10,7 @@
         <div class="flex justify-between mb-3">
           <div class="flex items-center gap-2">
             <img 
-              :src="question ? question.avatar : '/avatar.jpg'" 
+              :src="getRandomAvatar(question ? question.user : '学员0111')" 
               alt="用户头像" 
               class="w-8 h-8 rounded-full" 
             />
@@ -51,7 +51,7 @@
         <div class="flex gap-4">
           <div class="flex-shrink-0">
             <img
-              src="/avatar1.jpg"
+              :src="getRandomAvatar('爱学习的涛涛')"
               alt="用户头像"
               class="w-10 h-10 rounded-full"
             />
@@ -79,7 +79,7 @@
         <div class="flex gap-4">
           <div class="flex-shrink-0">
             <img
-              src="/avatar2.jpg"
+              :src="getRandomAvatar('爱思考的飞飞')"
               alt="用户头像"
               class="w-10 h-10 rounded-full"
             />
@@ -160,7 +160,7 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { ref, reactive } from "vue";
 import { EpChatDotSquare } from "vue-icons-plus/ep";
 import { IpGoodTwo } from "vue-icons-plus/ip";
 
@@ -172,6 +172,58 @@ const props = defineProps({
 });
 
 const commentText = ref("");
+
+// 用户头像缓存，确保同一用户始终使用同一头像
+const avatarCache = reactive(new Map());
+
+/**
+ * 获取随机头像URL
+ * @param {string} username - 用户名（用作种子以确保同一用户获得同一头像）
+ * @returns {string} - 头像URL
+ */
+const getRandomAvatar = (username) => {
+  // 如果已经有缓存的头像，直接返回
+  if (avatarCache.has(username)) {
+    return avatarCache.get(username);
+  }
+  
+  // 可用的头像API选项
+  const avatarApis = [
+    // 随机动物头像
+    () => `https://placeimg.com/200/200/animals?${Math.random()}`,
+    // 随机抽象头像
+    () => `https://avatars.dicebear.com/api/bottts/${encodeURIComponent(username)}.svg`,
+    // 随机像素头像
+    () => `https://avatars.dicebear.com/api/pixel-art/${encodeURIComponent(username)}.svg`,
+    // 随机卡通头像
+    () => `https://avatars.dicebear.com/api/avataaars/${encodeURIComponent(username)}.svg`,
+    // 随机彩色几何头像
+    () => `https://avatars.dicebear.com/api/identicon/${encodeURIComponent(username)}.svg`,
+    // 随机男性头像
+    () => `https://randomuser.me/api/portraits/men/${Math.floor(Math.random() * 100)}.jpg`,
+    // 随机女性头像
+    () => `https://randomuser.me/api/portraits/women/${Math.floor(Math.random() * 100)}.jpg`,
+  ];
+  
+  // 使用字符串散列函数生成一个一致的随机数
+  const hashCode = (str) => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = ((hash << 5) - hash) + str.charCodeAt(i);
+      hash |= 0;
+    }
+    return Math.abs(hash);
+  };
+  
+  // 根据用户名选择API
+  const apiIndex = hashCode(username) % avatarApis.length;
+  const avatarUrl = avatarApis[apiIndex]();
+  
+  // 将结果缓存，确保同一用户每次获取相同头像
+  avatarCache.set(username, avatarUrl);
+  
+  return avatarUrl;
+};
 
 const submitComment = () => {
   console.log("提交评论:", commentText.value);

@@ -66,7 +66,11 @@
             <div class="text-gray-500">发布时间：{{ question.time }}</div>
           </div>
           <div class="flex items-center gap-2">
-            <img :src="question.avatar" alt="用户头像" class="w-8 h-8 rounded-full" />
+            <img
+              :src="getRandomAvatar(question ? question.user : '学员0111')"
+              alt="用户头像"
+              class="w-8 h-8 rounded-full"
+            />
             <span class="text-gray-700">{{ question.user }}</span>
           </div>
         </div>
@@ -83,7 +87,7 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { ref, reactive } from "vue";
 import { IoSearchOutline, IoChevronDownOutline, IoAddOutline } from "vue-icons-plus/io5";
 import NewQuestionModal from "./NewQuestionModal.vue";
 
@@ -148,7 +152,7 @@ const handleSubmitQuestion = (questionData) => {
   questions.value.unshift({
     id: questions.value.length + 1,
     status: "待回复",
-    title: questionData.title,
+    title: questionData.title || "未命名问题",
     content: questionData.content,
     time: new Date()
       .toLocaleString("zh-CN", {
@@ -160,12 +164,69 @@ const handleSubmitQuestion = (questionData) => {
         second: "2-digit",
       })
       .replace(/\//g, "-"),
-    user: "学员0111",
+    user: "当前用户",
     avatar: "/avatar.jpg",
   });
 
   // 关闭弹窗
   showNewQuestionModal.value = false;
+};
+
+// 用户头像缓存，确保同一用户始终使用同一头像
+const avatarCache = reactive(new Map());
+
+/**
+ * 获取随机头像URL
+ * @param {string} username - 用户名（用作种子以确保同一用户获得同一头像）
+ * @returns {string} - 头像URL
+ */
+const getRandomAvatar = (username) => {
+  // 如果已经有缓存的头像，直接返回
+  if (avatarCache.has(username)) {
+    return avatarCache.get(username);
+  }
+
+  // 可用的头像API选项
+  const avatarApis = [
+    // 随机动物头像
+    () => `https://placeimg.com/200/200/animals?${Math.random()}`,
+    // 随机抽象头像
+    () => `https://avatars.dicebear.com/api/bottts/${encodeURIComponent(username)}.svg`,
+    // 随机像素头像
+    () =>
+      `https://avatars.dicebear.com/api/pixel-art/${encodeURIComponent(username)}.svg`,
+    // 随机卡通头像
+    () =>
+      `https://avatars.dicebear.com/api/avataaars/${encodeURIComponent(username)}.svg`,
+    // 随机彩色几何头像
+    () =>
+      `https://avatars.dicebear.com/api/identicon/${encodeURIComponent(username)}.svg`,
+    // 随机男性头像
+    () =>
+      `https://randomuser.me/api/portraits/men/${Math.floor(Math.random() * 100)}.jpg`,
+    // 随机女性头像
+    () =>
+      `https://randomuser.me/api/portraits/women/${Math.floor(Math.random() * 100)}.jpg`,
+  ];
+
+  // 使用字符串散列函数生成一个一致的随机数
+  const hashCode = (str) => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = (hash << 5) - hash + str.charCodeAt(i);
+      hash |= 0;
+    }
+    return Math.abs(hash);
+  };
+
+  // 根据用户名选择API
+  const apiIndex = hashCode(username) % avatarApis.length;
+  const avatarUrl = avatarApis[apiIndex]();
+
+  // 将结果缓存，确保同一用户每次获取相同头像
+  avatarCache.set(username, avatarUrl);
+
+  return avatarUrl;
 };
 
 // 点击问题跳转到详情

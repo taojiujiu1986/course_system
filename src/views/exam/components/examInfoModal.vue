@@ -13,7 +13,7 @@
       </div>
 
       <!-- 弹窗内容 -->
-      <div class="p-4">
+      <div class="p-4" v-if="examInfo">
         <div class="grid grid-cols-3 gap-4">
           <!-- 左侧信息 -->
           <div class="col-span-2">
@@ -22,35 +22,47 @@
                 <div class="w-20 text-black bg-gray-100 text-center rounded">
                   考试名称
                 </div>
-                <div class="flex-1 font-medium">{{ exam.title }}</div>
+                <div class="flex-1 font-medium">{{ examInfo.examTitle }}</div>
               </div>
 
               <div class="flex py-3 gap-4">
                 <div class="w-20 text-black bg-gray-100 text-center rounded">
                   考试总分
                 </div>
-                <div class="flex-1 font-medium">{{ exam.totalScore }}分</div>
+                <div class="flex-1 font-medium">{{ examInfo.totalScore }}分</div>
               </div>
 
               <div class="flex py-3 gap-4">
                 <div class="w-20 text-black bg-gray-100 text-center rounded">
                   及格分数
                 </div>
-                <div class="flex-1 font-medium">{{ exam.passingScore }}分</div>
+                <div class="flex-1 font-medium">{{ examInfo.qualifyScore }}分</div>
               </div>
 
               <div class="flex py-3 gap-4">
                 <div class="w-20 text-black bg-gray-100 text-center rounded">
                   考试时长
                 </div>
-                <div class="flex-1 font-medium">{{ exam.duration }}分钟</div>
+                <div class="flex-1 font-medium">{{ examInfo.examTime }}分钟</div>
               </div>
 
               <div class="flex py-3 gap-4">
                 <div class="w-20 text-black bg-gray-100 text-center rounded">
                   考试类型
                 </div>
-                <div class="flex-1 font-medium">{{ exam.type }}</div>
+                <div class="flex-1 font-medium">
+                  {{ getExamType(examInfo.examType) }}
+                </div>
+              </div>
+
+              <div class="flex py-3 gap-4">
+                <div class="w-20 text-black bg-gray-100 text-center rounded">
+                  考试时间
+                </div>
+                <div class="flex-1 font-medium">
+                  {{ formatTimestamp(examInfo.startTime) }} ~
+                  {{ formatTimestamp(examInfo.endTime) }}
+                </div>
               </div>
             </div>
           </div>
@@ -58,24 +70,48 @@
           <!-- 右侧图片 -->
           <div class="col-span-1">
             <div class="rounded-md p-2">
-              <img
-                src="../../../assets/exam-sample.png"
-                alt="考试图片"
-                class="w-full h-auto"
-              />
+              <img :src="examInfo.image" alt="考试图片" class="w-full h-auto" />
             </div>
           </div>
         </div>
 
-        <!-- 考试规则 -->
+        <!-- 考试规则和说明 -->
         <div class="mt-4 p-4 bg-gray-50 rounded-md">
-          <div
-            v-for="(rule, index) in exam.rules"
-            :key="index"
-            class="flex items-start mb-2 last:mb-0"
-          >
-            <span class="text-red-500 mr-2">{{ index + 1 }}.</span>
-            <span class="text-red-500 mr-2">{{ rule }}</span>
+          <h4 class="font-medium mb-2">考试说明</h4>
+          <div class="mb-4" v-html="examInfo.examBrief || '暂无考试说明'"></div>
+
+          <h4 class="font-medium mb-2">考试规则</h4>
+          <div class="flex items-start mb-2">
+            <span class="text-red-500 mr-2">1.</span>
+            <span class="text-red-500"
+              >考试开始后，请勿刷新页面或关闭浏览器，否则可能导致考试中断。</span
+            >
+          </div>
+          <div class="flex items-start mb-2">
+            <span class="text-red-500 mr-2">2.</span>
+            <span class="text-red-500"
+              >考试过程中请勿切换标签页或打开其他窗口，系统将记录切屏次数。</span
+            >
+          </div>
+          <div class="flex items-start mb-2">
+            <span class="text-red-500 mr-2">3.</span>
+            <span class="text-red-500"
+              >提交试卷后将无法修改答案，请在提交前确认所有题目已作答。</span
+            >
+          </div>
+          <div class="flex items-start mb-2">
+            <span class="text-red-500 mr-2">4.</span>
+            <span class="text-red-500"
+              >考试时间结束后，系统将自动提交当前已作答的试题。</span
+            >
+          </div>
+          <div class="flex items-start mb-2">
+            <span class="text-red-500 mr-2">5.</span>
+            <span class="text-red-500">如遇技术问题，请立即联系管理员寻求帮助。</span>
+          </div>
+          <div v-if="examInfo.reviewRule" class="flex items-start mb-2">
+            <span class="text-red-500 mr-2">6.</span>
+            <span class="text-red-500">阅卷规则：{{ examInfo.reviewRule }}</span>
           </div>
         </div>
 
@@ -89,16 +125,25 @@
           </button>
         </div>
       </div>
+
+      <!-- 加载状态 -->
+      <div v-else class="p-6 text-center">
+        <div
+          class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"
+        ></div>
+        <p>加载考试信息中...</p>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
+import { ref, onMounted } from "vue";
 import { IoCloseOutline } from "vue-icons-plus/io";
 
 // 接收考试信息
 const props = defineProps({
-  exam: {
+  examInfo: {
     type: Object,
     required: true,
   },
@@ -106,4 +151,27 @@ const props = defineProps({
 
 // 定义事件
 defineEmits(["close", "start"]);
+
+// 获取考试类型文本
+const getExamType = (type) => {
+  const types = {
+    1: "笔试考试",
+    2: "面试考试",
+    3: "实操考试",
+    4: "综合考试",
+  };
+  return types[type] || "未知类型";
+};
+
+// 格式化时间戳
+const formatTimestamp = (timestamp) => {
+  if (!timestamp) return "";
+  const date = new Date(timestamp);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
+};
 </script>

@@ -45,6 +45,19 @@
             </div>
           </div>
 
+          <div class="mb-4">
+            <div class="flex items-center mb-1">
+              <span class="text-red-500 mr-1">*</span>
+              <label class="text-gray-700">问题标题：</label>
+            </div>
+            <input
+              v-model="questionTitle"
+              placeholder="请输入问题标题（简明扼要）"
+              class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              required
+            />
+          </div>
+
           <div class="mb-6">
             <div class="flex items-center mb-1">
               <span class="text-red-500 mr-1">*</span>
@@ -97,6 +110,7 @@ const coursewareOptions = [
 
 const showCoursewareDropdown = ref(false);
 const selectedCourseware = ref("");
+const questionTitle = ref("");
 const questionContent = ref("");
 
 // 选择课件
@@ -107,7 +121,11 @@ const selectCourseware = (courseware) => {
 
 // 表单验证
 const isFormValid = computed(() => {
-  return selectedCourseware.value && questionContent.value.trim().length > 0;
+  return (
+    selectedCourseware.value &&
+    questionTitle.value.trim().length > 0 &&
+    questionContent.value.trim().length > 0
+  );
 });
 
 // 提交表单
@@ -116,11 +134,13 @@ const handleSubmit = () => {
 
   emit("submit", {
     courseware: selectedCourseware.value,
+    title: questionTitle.value,
     content: questionContent.value,
   });
 
   // 重置表单
   selectedCourseware.value = "";
+  questionTitle.value = "";
   questionContent.value = "";
 };
 </script>

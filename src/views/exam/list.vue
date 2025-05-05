@@ -10,15 +10,21 @@
       <div class="flex justify-between items-center container">
         <div class="flex space-x-2 bg-[#1771FD] p-[5px] mb-4">
           <button
-            class="px-4 py-1 text-white rounded-md"
-            :class="{ 'bg-white text-[#1771FD]': activeTab === 'center' }"
+            class="px-4 py-1 rounded-md"
+            :class="{
+              'bg-white text-[#1771FD]': activeTab === 'center',
+              'text-white': activeTab !== 'center',
+            }"
             @click="activeTab = 'center'"
           >
             考试中心
           </button>
           <button
-            class="px-4 py-1 text-white rounded-md"
-            :class="{ 'bg-white text-[#1771FD]': activeTab === 'my' }"
+            class="px-4 py-1 rounded-md"
+            :class="{
+              'bg-white text-[#1771FD]': activeTab === 'my',
+              'text-white': activeTab !== 'my',
+            }"
             @click="activeTab = 'my'"
           >
             我的考试
@@ -28,11 +34,14 @@
         <div class="relative">
           <input
             type="text"
+            v-model="searchKeyword"
             placeholder="请输入考试名称"
             class="border border-gray-300 rounded-md pl-3 pr-10 py-1 w-64 focus:outline-none focus:ring-1 focus:ring-[#1771FD]"
+            @keyup.enter="searchExam"
           />
           <button
             class="absolute right-0 top-0 h-full w-10 bg-[#1771FD] rounded-r-md flex items-center justify-center"
+            @click="searchExam"
           >
             <CgSearch class="text-white w-5 h-5" />
           </button>
@@ -45,50 +54,49 @@
       <!-- 考试列表 -->
       <div class="flex flex-col gap-4">
         <div
-          v-for="(exam, index) in myExams"
+          v-for="(exam, index) in allExams"
           :key="index"
           class="bg-white rounded-lg overflow-hidden container"
         >
           <div class="p-4 flex flex-col md:flex-row items-start gap-4">
             <!-- 考试图片 -->
             <div class="w-48 flex-shrink-0">
-              <img
-                src="../../assets/exam-sample.png"
-                alt="考试图片"
-                class="w-full h-auto"
-              />
+              <img :src="exam.image" alt="考试图片" class="w-full h-auto" />
             </div>
 
             <!-- 考试信息 -->
             <div class="flex-1">
               <h3 class="text-lg font-bold text-gray-800 mb-2">
-                {{ exam.title }}
+                {{ exam.examTitle }}
               </h3>
 
               <div class="flex flex-col gap-2 mb-2">
                 <div class="text-gray-600">
                   <span>考试时间：</span>
-                  <span>{{ exam.timeRange }}</span>
+                  <span
+                    >{{ formatTimestamp(exam.startTime) }} ~
+                    {{ formatTimestamp(exam.endTime) }}</span
+                  >
                 </div>
                 <div class="text-gray-600">
                   <span>考试状态：</span>
                   <span
                     :class="{
-                      'text-green-500': exam.status === '已通过',
-                      'text-red-500': exam.status === '未通过',
-                      'text-[#1771FD]': exam.status === '未参加',
+                      'text-green-500': exam.status === 3,
+                      'text-red-500': exam.status === 4,
+                      'text-[#1771FD]': exam.status === 1,
                     }"
-                    >{{ exam.status }}</span
+                    >{{ getExamStatus(exam.status) }}</span
                   >
                 </div>
                 <div class="text-gray-600">
                   <span>考试成绩：</span>
                   <span
                     :class="{
-                      'text-green-500': exam.score >= 60,
-                      'text-red-500': exam.score < 60,
+                      'text-green-500': exam.score >= exam.qualifyScore,
+                      'text-red-500': exam.score < exam.qualifyScore,
                     }"
-                    >{{ exam.score }}分</span
+                    >{{ exam.score || 0 }}分</span
                   >
                 </div>
               </div>
@@ -98,7 +106,7 @@
               >
                 <div>
                   <span>时长：</span>
-                  <span>{{ exam.duration }}分钟</span>
+                  <span>{{ exam.examTime }}分钟</span>
                 </div>
                 <div>
                   <span>总分：</span>
@@ -106,7 +114,7 @@
                 </div>
                 <div>
                   <span>及格分：</span>
-                  <span>{{ exam.passingScore }}分</span>
+                  <span>{{ exam.qualifyScore }}分</span>
                 </div>
               </div>
             </div>
@@ -126,24 +134,51 @@
 
       <!-- 分页 -->
       <div class="flex justify-center items-center mt-8 space-x-2 mb-8">
-        <button class="px-3 py-1 text-black hover:text-[#1771FD]">首页</button>
-        <button class="px-3 py-1 text-black hover:text-[#1771FD] flex items-center">
-          <CgChevronLeft class="w-4 h-4 mr-1" />上一页
+        <button class="px-3 py-1 text-black hover:text-[#1771FD]" @click="changePage(1)">
+          首页
         </button>
         <button
-          v-for="page in 6"
-          :key="page"
-          class="w-8 h-8 rounded-full flex items-center justify-center"
-          :class="
-            page === 1 ? 'bg-[#1771FD] text-white' : 'text-black hover:text-[#1771FD]'
+          class="px-3 py-1 text-black hover:text-[#1771FD] flex items-center"
+          @click="
+            pageParams.offset > 0
+              ? changePage(Math.floor(pageParams.offset / pageParams.limit))
+              : null
           "
+          :disabled="pageParams.offset === 0"
         >
-          {{ page }}
+          <CgChevronLeft class="w-4 h-4 mr-1" />上一页
         </button>
-        <button class="px-3 py-1 text-black hover:text-[#1771FD] flex items-center">
+
+        <!-- 页码按钮 -->
+        <template v-if="totalPages > 0">
+          <button
+            v-for="page in getPaginationRange()"
+            :key="page"
+            class="w-8 h-8 rounded-full flex items-center justify-center"
+            :class="
+              currentPage === page
+                ? 'bg-[#1771FD] text-white'
+                : 'text-black hover:text-[#1771FD]'
+            "
+            @click="changePage(page)"
+          >
+            {{ page }}
+          </button>
+        </template>
+
+        <button
+          class="px-3 py-1 text-black hover:text-[#1771FD] flex items-center"
+          @click="currentPage < totalPages ? changePage(currentPage + 1) : null"
+          :disabled="currentPage >= totalPages"
+        >
           下一页<CgChevronRight class="w-4 h-4 ml-1" />
         </button>
-        <button class="px-3 py-1 text-black hover:text-[#1771FD]">尾页</button>
+        <button
+          class="px-3 py-1 text-black hover:text-[#1771FD]"
+          @click="changePage(totalPages)"
+        >
+          尾页
+        </button>
       </div>
     </template>
 
@@ -170,27 +205,26 @@
               >
                 {{ exam.statusTag }}
               </div>
-              <img
-                src="../../assets/exam-sample.png"
-                alt="考试图片"
-                class="w-full h-full"
-              />
+              <img :src="exam.imageUrl" alt="考试图片" class="w-full h-full" />
             </div>
 
             <!-- 考试信息 -->
             <div class="flex-1">
               <h3 class="text-lg font-bold text-gray-800 mb-2">
-                {{ exam.title }}
+                {{ exam.examTitle }}
               </h3>
 
               <div class="flex flex-col gap-2 mb-2">
                 <div class="text-gray-600">
                   <span>考试时间：</span>
-                  <span>{{ exam.timeRange }}</span>
+                  <span
+                    >{{ formatTimestamp(exam.startTime) }} ~
+                    {{ formatTimestamp(exam.endTime) }}</span
+                  >
                 </div>
                 <div class="text-gray-600">
                   <span>考试时长：</span>
-                  <span>{{ exam.duration }}分钟</span>
+                  <span>{{ exam.examTime }}分钟</span>
                 </div>
                 <div class="text-gray-600">
                   <span>试卷总分：</span>
@@ -199,15 +233,12 @@
                 <div class="text-gray-600 flex justify-between">
                   <div>
                     <span>及格分数：</span>
-                    <span>{{ exam.passingScore }}分</span>
+                    <span>{{ exam.qualifyScore }}分</span>
                   </div>
 
                   <!-- 操作按钮 -->
                   <div class="flex-shrink-0 self-center mt-2 md:mt-0 flex flex-col gap-2">
-                    <div
-                      v-if="exam.statusTag === '已出分' || exam.statusTag === '阅卷中'"
-                      class="flex gap-2"
-                    >
+                    <div class="flex gap-2">
                       <button
                         class="bg-[#1771FD] text-white px-4 py-1.5 rounded-full hover:bg-blue-600 transition mb-2 w-24"
                         @click="goToExamReview(exam.id)"
@@ -215,14 +246,14 @@
                         考试记录
                       </button>
                     </div>
-                    <div v-else-if="exam.statusTag === '未开始'">
+                    <!-- <div v-else-if="exam.status === 1">
                       <button
                         class="bg-[#1771FD] text-white px-4 py-1.5 rounded-full hover:bg-blue-600 transition w-24"
                         @click="openExamModal(exam)"
                       >
                         去考试
                       </button>
-                    </div>
+                    </div> -->
                   </div>
                 </div>
               </div>
@@ -231,13 +262,17 @@
               <div class="mt-3 bg-blue-50 rounded-md overflow-hidden">
                 <div class="grid grid-cols-3 text-center">
                   <div class="py-2 px-4 bg-[#1771FD] text-white">
-                    <div>我的得分：{{ exam.myScore }}</div>
+                    <div>我的得分：{{ exam.points || 0 }}</div>
                   </div>
                   <div class="py-2 px-4 bg-[#1771FD] text-white">
-                    <div>通过情况：{{ exam.passStatus }}</div>
+                    <div>
+                      通过情况：{{
+                        exam.points >= exam.qualifyScore ? "已通过" : "未通过"
+                      }}
+                    </div>
                   </div>
                   <div class="py-2 px-4 bg-[#1771FD] text-white">
-                    <div>考试机会：{{ exam.attempts }}</div>
+                    <div>考试机会：{{ exam.chanceUsed || 0 }}/{{ exam.chance }}</div>
                   </div>
                 </div>
               </div>
@@ -247,24 +282,51 @@
       </div>
       <!-- 分页 -->
       <div class="flex justify-center items-center mt-8 space-x-2 mb-8">
-        <button class="px-3 py-1 text-black hover:text-[#1771FD]">首页</button>
-        <button class="px-3 py-1 text-black hover:text-[#1771FD] flex items-center">
-          <CgChevronLeft class="w-4 h-4 mr-1" />上一页
+        <button class="px-3 py-1 text-black hover:text-[#1771FD]" @click="changePage(1)">
+          首页
         </button>
         <button
-          v-for="page in 6"
-          :key="page"
-          class="w-8 h-8 rounded-full flex items-center justify-center"
-          :class="
-            page === 1 ? 'bg-[#1771FD] text-white' : 'text-black hover:text-[#1771FD]'
+          class="px-3 py-1 text-black hover:text-[#1771FD] flex items-center"
+          @click="
+            pageParams.offset > 0
+              ? changePage(Math.floor(pageParams.offset / pageParams.limit))
+              : null
           "
+          :disabled="pageParams.offset === 0"
         >
-          {{ page }}
+          <CgChevronLeft class="w-4 h-4 mr-1" />上一页
         </button>
-        <button class="px-3 py-1 text-black hover:text-[#1771FD] flex items-center">
+
+        <!-- 页码按钮 -->
+        <template v-if="totalPages > 0">
+          <button
+            v-for="page in getPaginationRange()"
+            :key="page"
+            class="w-8 h-8 rounded-full flex items-center justify-center"
+            :class="
+              currentPage === page
+                ? 'bg-[#1771FD] text-white'
+                : 'text-black hover:text-[#1771FD]'
+            "
+            @click="changePage(page)"
+          >
+            {{ page }}
+          </button>
+        </template>
+
+        <button
+          class="px-3 py-1 text-black hover:text-[#1771FD] flex items-center"
+          @click="currentPage < totalPages ? changePage(currentPage + 1) : null"
+          :disabled="currentPage >= totalPages"
+        >
           下一页<CgChevronRight class="w-4 h-4 ml-1" />
         </button>
-        <button class="px-3 py-1 text-black hover:text-[#1771FD]">尾页</button>
+        <button
+          class="px-3 py-1 text-black hover:text-[#1771FD]"
+          @click="changePage(totalPages)"
+        >
+          尾页
+        </button>
       </div>
     </template>
   </div>
@@ -272,18 +334,19 @@
   <!-- 考试信息弹窗 -->
   <ExamInfoModal
     v-if="showExamModal"
-    :exam="selectedExam"
+    :examInfo="selectedExam"
     @close="showExamModal = false"
     @start="startExam"
   />
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { ref, onMounted, watch } from "vue";
 import { CgChevronLeft, CgChevronRight } from "vue-icons-plus/cg";
 import { CgSearch } from "vue-icons-plus/cg";
 import { useRouter } from "vue-router";
 import ExamInfoModal from "./components/examInfoModal.vue";
+import { getExamPageList, getStudentRecordPageList } from "@/api/pland";
 
 // 使用 useRouter 钩子
 const router = useRouter();
@@ -294,17 +357,9 @@ const selectedExam = ref(null);
 
 // 打开考试弹窗
 const openExamModal = (exam) => {
+  // 直接使用API返回的字段
   selectedExam.value = {
     ...exam,
-    image: "../../assets/exam-sample.png",
-    type: "笔试考试",
-    rules: [
-      "考试开始后，请勿刷新页面或关闭浏览器，否则可能导致考试中断。",
-      "考试过程中请勿切换标签页或打开其他窗口，系统将记录切屏次数。",
-      "提交试卷后将无法修改答案，请在提交前确认所有题目已作答。",
-      "考试时间结束后，系统将自动提交当前已作答的试题。",
-      "如遇技术问题，请立即联系管理员寻求帮助。",
-    ],
   };
   showExamModal.value = true;
 };
@@ -318,8 +373,8 @@ const startExam = () => {
 };
 
 // 跳转到考试记录页面
-const goToExamReview = (examId) => {
-  router.push({ path: "/exam/review/" + examId });
+const goToExamReview = (id) => {
+  router.push({ path: "/exam/review/" + id });
 };
 
 // 考试状态筛选
@@ -337,95 +392,171 @@ const examTypes = ref([
   { name: "专项考试", active: false },
 ]);
 
-// 我的考试数据
-const myExams = ref([
-  {
-    id: 1,
-    title: "笔面过考-全程考试",
-    timeRange: "2025-04-30 09:59:31 ~ 2025-04-30 09:59:31",
-    status: "已通过",
-    score: 85,
-    duration: "30",
-    totalScore: "100",
-    passingScore: "60",
-    image: "/exam-image.jpg",
-    statusTag: "已出分",
-    myScore: "85",
-    passStatus: "通过",
-    attempts: "1/3",
-  },
-  {
-    id: 2,
-    title: "笔面过考-全程考试",
-    timeRange: "2025-04-30 09:59:31 ~ 2025-04-30 09:59:31",
-    status: "未通过",
-    score: 45,
-    duration: "30",
-    totalScore: "100",
-    passingScore: "60",
-    image: "/exam-image.jpg",
-    statusTag: "已出分",
-    myScore: "45",
-    passStatus: "未通过",
-    attempts: "1/3",
-  },
-  {
-    id: 3,
-    title: "笔面过考-全程考试",
-    timeRange: "2025-04-30 09:59:31 ~ 2025-04-30 09:59:31",
-    status: "未参加",
-    score: 0,
-    duration: "30",
-    totalScore: "100",
-    passingScore: "60",
-    image: "/exam-image.jpg",
-    statusTag: "未开始",
-    myScore: "0",
-    passStatus: "未参加",
-    attempts: "0/3",
-  },
-]);
+// 考试中心
+const allExams = ref([]);
+// 考试数据
+const myExams = ref([]);
+// 分页参数
+const pageParams = ref({
+  query: {},
+  limit: 10,
+  offset: 0,
+  order: "createTime desc",
+});
+// 搜索关键词
+const searchKeyword = ref("");
 
-const activeTab = ref("center");
+// 分页相关变量和函数
+const currentPage = ref(1);
+const totalItems = ref(0);
+const totalPages = ref(0);
 
-const policeTypes = ref([
-  { name: "全部", active: true },
-  { name: "刑侦", active: false },
-  { name: "网安", active: false },
-  { name: "科信", active: false },
-]);
+// 格式化时间戳
+const formatTimestamp = (timestamp) => {
+  if (!timestamp) return "";
+  const date = new Date(timestamp);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
+};
 
-const difficulties = ref([
-  { name: "全部", active: true },
-  { name: "简单", active: false },
-  { name: "中等", active: false },
-  { name: "困难", active: false },
-]);
+// 获取考试列表数据
+const fetchExamList = async () => {
+  if (activeTab.value === "center") {
+    // 考试中心 - 使用getExamPageList接口
+    try {
+      const response = await getExamPageList({
+        pageNo: currentPage.value,
+        pageSize: pageParams.value.limit,
+        ...pageParams.value.query,
+      });
 
-const categories = ref([
-  { name: "全部", active: true },
-  { name: "公安基础", active: false },
-  { name: "法律法规", active: false },
-  { name: "专业技能", active: false },
-]);
+      if (response.code === 200 || response.code === 0) {
+        // 直接使用API返回的数据
+        allExams.value = response.data.list;
 
-// 模拟考试数据
-const exams = ref(
-  Array(12)
-    .fill()
-    .map((_, index) => ({
-      id: index + 1,
-      title: ["公安基础知识测试", "法律法规考核", "专业技能评估", "综合素质测评"][
-        index % 4
-      ],
-      category: ["公安基础", "法律法规", "专业技能", "综合素质"][index % 4],
-      difficulty: ["简单", "中等", "困难"][index % 3],
-      questionCount: [50, 80, 100, 120][index % 4],
-      duration: [45, 60, 90, 120][index % 4],
-      image: "/course-image.jpg",
-    }))
-);
+        // 更新分页信息
+        totalItems.value = response.data.total;
+        totalPages.value = Math.ceil(totalItems.value / pageParams.value.limit);
+        currentPage.value =
+          Math.floor(pageParams.value.offset / pageParams.value.limit) + 1;
+      }
+    } catch (error) {
+      console.error("获取考试列表失败:", error);
+    }
+  } else {
+    // 我的考试 - 使用getStudentRecordPageList接口
+    try {
+      const response = await getStudentRecordPageList({
+        pageNo: currentPage.value,
+        pageSize: pageParams.value.limit,
+        ...pageParams.value.query,
+      });
 
+      if (response.code === 200 || response.code === 0) {
+        // 直接使用API返回的数据
+        myExams.value = response.data.list;
+
+        // 更新分页信息
+        totalItems.value = response.data.total;
+        totalPages.value = Math.ceil(totalItems.value / pageParams.value.limit);
+        currentPage.value =
+          Math.floor(pageParams.value.offset / pageParams.value.limit) + 1;
+      }
+    } catch (error) {
+      console.error("获取我的考试列表失败:", error);
+    }
+  }
+};
+
+// 根据API返回的状态获取展示状态
+const getExamStatus = (status) => {
+  // 假设状态值: 1=未开始，2=进行中，3=已结束
+  switch (status) {
+    case 1:
+      return "未参加";
+    case 2:
+      return "进行中";
+    case 3:
+      return "已通过"; // 这里需要根据实际成绩判断是否通过
+    default:
+      return "未参加";
+  }
+};
+
+// 获取状态标签
+const getStatusTag = (status) => {
+  // 假设状态值: 1=未开始，2=进行中，3=已结束
+  switch (status) {
+    case 1:
+      return "未开始";
+    case 2:
+      return "考试中";
+    case 3:
+      return "已出分"; // 假设考试结束就已出分
+    default:
+      return "未开始";
+  }
+};
+
+// 搜索考试
+const searchExam = () => {
+  if (searchKeyword.value) {
+    pageParams.value.query = {
+      ...pageParams.value.query,
+      examTitle: searchKeyword.value,
+    };
+  } else {
+    // 如果搜索关键词为空，删除查询条件中的examTitle
+    if (pageParams.value.query.examTitle) {
+      const { examTitle, ...rest } = pageParams.value.query;
+      pageParams.value.query = rest;
+    }
+  }
+  pageParams.value.offset = 0; // 重置页码
+  fetchExamList();
+};
+
+// 切换页码
+const changePage = (page) => {
+  if (page < 1 || page > totalPages.value) return;
+  currentPage.value = page;
+  pageParams.value.offset = (page - 1) * pageParams.value.limit;
+  fetchExamList();
+};
+
+// 获取分页范围（显示页码按钮）
+const getPaginationRange = () => {
+  const range = [];
+  const maxButtons = 5; // 最多显示5个页码按钮
+
+  if (totalPages.value <= maxButtons) {
+    // 总页数小于等于最大显示按钮数，显示所有页码
+    for (let i = 1; i <= totalPages.value; i++) {
+      range.push(i);
+    }
+  } else {
+    // 总页数大于最大显示按钮数，使用省略号显示
+    let start = Math.max(1, currentPage.value - Math.floor(maxButtons / 2));
+    let end = Math.min(totalPages.value, start + maxButtons - 1);
+
+    // 调整起始页，确保显示的按钮数量为maxButtons
+    if (end - start + 1 < maxButtons) {
+      start = Math.max(1, end - maxButtons + 1);
+    }
+
+    for (let i = start; i <= end; i++) {
+      range.push(i);
+    }
+  }
+
+  return range;
+};
+
+// 切换考试状态筛选
 const toggleFilter = (filterType, index) => {
   if (filterType === "policeTypes") {
     policeTypes.value = policeTypes.value.map((item, i) => ({
@@ -447,13 +578,82 @@ const toggleFilter = (filterType, index) => {
       ...item,
       active: i === index,
     }));
+
+    // 根据选择的状态筛选考试列表
+    if (index === 0) {
+      // 全部
+      delete pageParams.value.query.status;
+    } else if (index === 1) {
+      // 未开始
+      pageParams.value.query.status = 1;
+    } else if (index === 2) {
+      // 已完成
+      pageParams.value.query.status = 3;
+    }
+
+    fetchExamList();
   } else if (filterType === "examTypes") {
     examTypes.value = examTypes.value.map((item, i) => ({
       ...item,
       active: i === index,
     }));
+
+    // 根据选择的类型筛选考试列表
+    if (index === 0) {
+      // 全部
+      delete pageParams.value.query.examType;
+    } else {
+      // 其他类型，假设index对应examType值
+      pageParams.value.query.examType = index;
+    }
+
+    fetchExamList();
   }
 };
+
+const activeTab = ref("center");
+
+// 监听标签切换
+const handleTabChange = () => {
+  // 重置查询参数
+  pageParams.value = {
+    query: {},
+    limit: 10,
+    offset: 0,
+    order: "createTime desc",
+  };
+
+  // 重置当前页码
+  currentPage.value = 1;
+
+  fetchExamList();
+};
+
+// 监听标签变化
+watch(activeTab, () => {
+  handleTabChange();
+});
+
+const policeTypes = ref([
+  { name: "全部", active: true },
+  { name: "刑侦", active: false },
+  { name: "网安", active: false },
+  { name: "科信", active: false },
+]);
+
+const difficulties = ref([
+  { name: "全部", active: true },
+  { name: "简单", active: false },
+  { name: "中等", active: false },
+  { name: "困难", active: false },
+]);
+
+const categories = ref([
+  { name: "全部", active: true },
+  { name: "公安基础", active: false },
+  { name: "法律法规", active: false },
+  { name: "专业技能", active: false },
+]);
 
 const getDifficultyColor = (difficulty) => {
   switch (difficulty) {
@@ -478,6 +678,11 @@ const getStatusClass = (status) => {
       return "bg-gray-100 text-gray-600";
   }
 };
+
+// 页面加载时获取考试列表
+onMounted(() => {
+  fetchExamList();
+});
 </script>
 
 <style scoped>
